@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { writeFile, mkdir, readFile } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
-import { kv } from "@vercel/kv";
+import { createClient } from "@vercel/kv";
 
 const DEFAULT_ITEMS = [
   {
@@ -46,17 +46,24 @@ const getGalleryJsonPath = () => {
   return path.join(process.cwd(), "public", "uploads", "gallery.json");
 };
 
-const isKvConfigured = () => {
-  return !!process.env.KV_REST_API_URL || !!process.env.KV_URL;
+// Dynamic KV client initialization supporting Vercel KV and Upstash Redis integrations
+const getKvClient = () => {
+  const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || process.env.KV_URL || process.env.REDIS_URL;
+  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (url && token) {
+    return createClient({ url, token });
+  }
+  return null;
 };
 
 export async function GET() {
   try {
-    if (isKvConfigured()) {
-      let items = await kv.get<any[]>("gallery_items");
+    const kvClient = getKvClient();
+    if (kvClient) {
+      let items = await kvClient.get<any[]>("gallery_items");
       if (!items) {
         items = DEFAULT_ITEMS;
-        await kv.set("gallery_items", items);
+        await kvClient.set("gallery_items", items);
       }
       return NextResponse.json(items);
     } else {
@@ -98,13 +105,15 @@ export async function POST(req: Request) {
       }),
     };
 
-    if (isKvConfigured()) {
-      let items = await kv.get<any[]>("gallery_items");
+    const kvClient = getKvClient();
+
+    if (kvClient) {
+      let items = await kvClient.get<any[]>("gallery_items");
       if (!items) {
         items = [...DEFAULT_ITEMS];
       }
       items.unshift(newItem);
-      await kv.set("gallery_items", items);
+      await kvClient.set("gallery_items", items);
     } else {
       const jsonPath = getGalleryJsonPath();
       let items = [...DEFAULT_ITEMS];
@@ -146,9 +155,10 @@ export async function DELETE(req: Request) {
     }
 
     let items: any[] = [];
+    const kvClient = getKvClient();
 
-    if (isKvConfigured()) {
-      items = await kv.get<any[]>("gallery_items") || [];
+    if (kvClient) {
+      items = await kvClient.get<any[]>("gallery_items") || [];
     } else {
       const jsonPath = getGalleryJsonPath();
       if (existsSync(jsonPath)) {
@@ -170,8 +180,8 @@ export async function DELETE(req: Request) {
 
     const updatedItems = items.filter((item: any) => item.id !== id);
 
-    if (isKvConfigured()) {
-      await kv.set("gallery_items", updatedItems);
+    if (kvClient) {
+      await kvClient.set("gallery_items", updatedItems);
     } else {
       const jsonPath = getGalleryJsonPath();
       await writeFile(jsonPath, JSON.stringify(updatedItems, null, 2), "utf-8");

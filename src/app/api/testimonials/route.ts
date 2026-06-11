@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { writeFile, readFile, mkdir } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
-import { kv } from "@vercel/kv";
+import { createClient } from "@vercel/kv";
 
 const DEFAULT_TESTIMONIALS = [
   {
@@ -29,18 +29,24 @@ const getTestimonialsJsonPath = () => {
   return path.join(process.cwd(), "public", "uploads", "testimonials.json");
 };
 
-// Check if Vercel KV is configured
-const isKvConfigured = () => {
-  return !!process.env.KV_REST_API_URL || !!process.env.KV_URL;
+// Dynamic KV client initialization supporting Vercel KV and Upstash Redis integrations
+const getKvClient = () => {
+  const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || process.env.KV_URL || process.env.REDIS_URL;
+  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (url && token) {
+    return createClient({ url, token });
+  }
+  return null;
 };
 
 export async function GET() {
   try {
-    if (isKvConfigured()) {
-      let items = await kv.get<any[]>("testimonials");
+    const kvClient = getKvClient();
+    if (kvClient) {
+      let items = await kvClient.get<any[]>("testimonials");
       if (!items) {
         items = DEFAULT_TESTIMONIALS;
-        await kv.set("testimonials", items);
+        await kvClient.set("testimonials", items);
       }
       return NextResponse.json(items);
     } else {
@@ -72,10 +78,11 @@ export async function POST(req: Request) {
     }
 
     let items: any[] = [];
+    const kvClient = getKvClient();
 
     // 1. Get the items
-    if (isKvConfigured()) {
-      items = await kv.get<any[]>("testimonials") || [];
+    if (kvClient) {
+      items = await kvClient.get<any[]>("testimonials") || [];
     } else {
       // Local fallback
       const jsonPath = getTestimonialsJsonPath();
@@ -118,8 +125,8 @@ export async function POST(req: Request) {
     }
 
     // 2. Save items
-    if (isKvConfigured()) {
-      await kv.set("testimonials", items);
+    if (kvClient) {
+      await kvClient.set("testimonials", items);
     } else {
       // Local fallback
       const jsonPath = getTestimonialsJsonPath();
@@ -150,10 +157,11 @@ export async function DELETE(req: Request) {
     }
 
     let items: any[] = [];
+    const kvClient = getKvClient();
 
     // 1. Get items
-    if (isKvConfigured()) {
-      items = await kv.get<any[]>("testimonials") || [];
+    if (kvClient) {
+      items = await kvClient.get<any[]>("testimonials") || [];
     } else {
       // Local fallback
       const jsonPath = getTestimonialsJsonPath();
@@ -172,8 +180,8 @@ export async function DELETE(req: Request) {
     const updatedItems = items.filter((item: any) => item.id !== id);
 
     // 2. Save items
-    if (isKvConfigured()) {
-      await kv.set("testimonials", updatedItems);
+    if (kvClient) {
+      await kvClient.set("testimonials", updatedItems);
     } else {
       // Local fallback
       const jsonPath = getTestimonialsJsonPath();
