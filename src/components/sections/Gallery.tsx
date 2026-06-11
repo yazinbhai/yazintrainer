@@ -3,16 +3,16 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Upload, 
+  Plus, 
   Trash2, 
   Image as ImageIcon, 
   Video as VideoIcon, 
   Play, 
   X, 
-  Plus, 
   Lock, 
   Unlock,
-  Loader2
+  Loader2,
+  Link as LinkIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -22,6 +22,33 @@ interface GalleryItem {
   type: string; // 'photo' | 'video'
   url: string;
   date: string;
+}
+
+// Helpers for YouTube and Imgur URLs
+function getYouTubeId(url: string): string | null {
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+  const match = url.match(regExp);
+  return (match && match[2].length === 11) ? match[2] : null;
+}
+
+function getYouTubeEmbedUrl(url: string): string {
+  const id = getYouTubeId(url);
+  return id ? `https://www.youtube.com/embed/${id}?autoplay=1` : url;
+}
+
+function getYouTubeThumbnail(url: string): string {
+  const id = getYouTubeId(url);
+  return id ? `https://img.youtube.com/vi/${id}/maxresdefault.jpg` : "/default-video-thumbnail.jpg";
+}
+
+function getDirectImgurUrl(url: string): string {
+  if (url.includes("imgur.com") && !url.includes("i.imgur.com")) {
+    const match = url.match(/imgur\.com\/([a-zA-Z0-9]+)$/);
+    if (match) {
+      return `https://i.imgur.com/${match[1]}.jpg`;
+    }
+  }
+  return url;
 }
 
 export function Gallery() {
@@ -38,16 +65,12 @@ export function Gallery() {
   const [loginError, setLoginError] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
   
-  // Upload form state
+  // Upload/Link form state
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploadType, setUploadType] = useState<"photo" | "video">("photo");
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadUrl, setUploadUrl] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
-  
-  // Drag and drop state
-  const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Delete Confirmation modal states
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
@@ -112,89 +135,43 @@ export function Gallery() {
     (item) => activeTab === "all" || item.type === activeTab
   );
 
-  // Drag & drop handlers
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0];
-      validateAndSetFile(file);
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      validateAndSetFile(e.target.files[0]);
-    }
-  };
-
-  const validateAndSetFile = (file: File) => {
-    const fileType = file.type.split("/")[0];
-    if (uploadType === "photo" && fileType !== "image") {
-      setUploadError("Please select an image file (PNG, JPG, WebP, etc.)");
-      setUploadFile(null);
-      return;
-    }
-    if (uploadType === "video" && fileType !== "video") {
-      setUploadError("Please select a video file (MP4, WebM, etc.)");
-      setUploadFile(null);
-      return;
-    }
-    setUploadError("");
-    setUploadFile(file);
-    // Auto-fill title if empty
-    if (!uploadTitle) {
-      const nameWithoutExt = file.name.substring(0, file.name.lastIndexOf(".")) || file.name;
-      setUploadTitle(nameWithoutExt.replace(/[-_]/g, " "));
-    }
-  };
-
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!uploadFile) {
-      setUploadError("Please select a file to upload.");
+    if (!uploadUrl) {
+      setUploadError("Please enter a media URL.");
       return;
     }
 
     setIsUploading(true);
     setUploadError("");
 
-    const formData = new FormData();
-    formData.append("file", uploadFile);
-    formData.append("title", uploadTitle);
-    formData.append("type", uploadType);
-
     try {
+      const finalUrl = getDirectImgurUrl(uploadUrl);
+
       const res = await fetch("/api/gallery", {
         method: "POST",
         headers: {
+          "Content-Type": "application/json",
           "x-admin-password": adminPassword,
         },
-        body: formData,
+        body: JSON.stringify({
+          title: uploadTitle,
+          type: uploadType,
+          url: finalUrl,
+        }),
       });
 
       if (res.ok) {
-        // Success
         setUploadTitle("");
-        setUploadFile(null);
+        setUploadUrl("");
         setIsUploadOpen(false);
         fetchItems();
       } else {
         const errorData = await res.json();
-        setUploadError(errorData.error || "Upload failed. Please try again.");
+        setUploadError(errorData.error || "Save failed. Please try again.");
       }
     } catch (err) {
-      setUploadError("Network error. Upload failed.");
+      setUploadError("Network error. Save failed.");
     } finally {
       setIsUploading(false);
     }
@@ -277,7 +254,7 @@ export function Gallery() {
                   className="rounded-full flex items-center gap-2 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>Upload Media</span>
+                  <span>Add Link</span>
                 </Button>
               </motion.div>
             )}
@@ -331,12 +308,21 @@ export function Gallery() {
                 ) : (
                   <div className="relative w-full h-full bg-black flex items-center justify-center">
                     <div className="absolute inset-0 bg-brand-navy/80 flex items-center justify-center">
-                      <video 
-                        src={item.url} 
-                        className="w-full h-full object-cover opacity-60"
-                        muted 
-                        playsInline
-                      />
+                      {getYouTubeId(item.url) ? (
+                        <img
+                          src={getYouTubeThumbnail(item.url)}
+                          alt={item.title}
+                          className="w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-500"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <video 
+                          src={item.url} 
+                          className="w-full h-full object-cover opacity-60"
+                          muted 
+                          playsInline
+                        />
+                      )}
                     </div>
                     {/* Dark gradient overlay */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
@@ -387,7 +373,7 @@ export function Gallery() {
               <h3 className="text-xl font-bold text-brand-navy mb-2">No media found</h3>
               <p className="text-gray-500">
                 {activeTab === "all"
-                  ? "Upload photos or videos to start building your gallery."
+                  ? "Add photo or video links to start building your gallery."
                   : `No ${activeTab} items exist in your gallery.`}
               </p>
             </div>
@@ -431,12 +417,22 @@ export function Gallery() {
                 </div>
               ) : (
                 <div className="w-full max-h-[75vh] aspect-video bg-black rounded-xl overflow-hidden shadow-2xl border border-white/10">
-                  <video
-                    src={activeLightbox.url}
-                    className="w-full h-full object-contain"
-                    controls
-                    autoPlay
-                  />
+                  {getYouTubeId(activeLightbox.url) ? (
+                    <iframe
+                      src={getYouTubeEmbedUrl(activeLightbox.url)}
+                      title={activeLightbox.title}
+                      className="w-full h-full border-0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <video
+                      src={activeLightbox.url}
+                      className="w-full h-full object-contain"
+                      controls
+                      autoPlay
+                    />
+                  )}
                 </div>
               )}
 
@@ -452,7 +448,7 @@ export function Gallery() {
         )}
       </AnimatePresence>
 
-      {/* Upload Media Modal */}
+      {/* Link Media Modal */}
       <AnimatePresence>
         {isUploadOpen && (
           <motion.div
@@ -472,8 +468,8 @@ export function Gallery() {
               {/* Modal Header */}
               <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-brand-navy text-white">
                 <h3 className="text-xl font-bold flex items-center gap-2">
-                  <Upload className="w-5 h-5 text-brand-gold" />
-                  <span>Upload Media</span>
+                  <LinkIcon className="w-5 h-5 text-brand-gold" />
+                  <span>Add Gallery Item</span>
                 </h3>
                 <button
                   onClick={() => setIsUploadOpen(false)}
@@ -509,7 +505,7 @@ export function Gallery() {
                       type="button"
                       onClick={() => {
                         setUploadType("photo");
-                        setUploadFile(null); // Reset file
+                        setUploadUrl("");
                       }}
                       className={`flex items-center justify-center gap-2 py-3 rounded-xl border font-medium transition-all cursor-pointer ${
                         uploadType === "photo"
@@ -524,7 +520,7 @@ export function Gallery() {
                       type="button"
                       onClick={() => {
                         setUploadType("video");
-                        setUploadFile(null); // Reset file
+                        setUploadUrl("");
                       }}
                       className={`flex items-center justify-center gap-2 py-3 rounded-xl border font-medium transition-all cursor-pointer ${
                         uploadType === "video"
@@ -538,57 +534,24 @@ export function Gallery() {
                   </div>
                 </div>
 
-                {/* File Upload Zone */}
+                {/* URL Input */}
                 <div className="space-y-2">
-                  <span className="text-sm font-semibold text-brand-navy block">Select File</span>
-                  
-                  <div
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                    onClick={() => fileInputRef.current?.click()}
-                    className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[160px] ${
-                      isDragging
-                        ? "border-brand-gold bg-brand-navy/5"
-                        : "border-gray-300 hover:border-brand-navy hover:bg-gray-50"
-                    }`}
-                  >
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept={uploadType === "photo" ? "image/*" : "video/*"}
-                      onChange={handleFileChange}
-                      className="hidden"
-                    />
-
-                    {uploadFile ? (
-                      <div className="space-y-2">
-                        {uploadType === "photo" ? (
-                          <ImageIcon className="w-10 h-10 text-brand-gold animate-bounce" />
-                        ) : (
-                          <VideoIcon className="w-10 h-10 text-brand-gold animate-bounce" />
-                        )}
-                        <p className="text-sm font-semibold text-brand-navy line-clamp-1 max-w-[240px]">
-                          {uploadFile.name}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {(uploadFile.size / (1024 * 1024)).toFixed(2)} MB
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <Upload className="w-10 h-10 text-gray-400" />
-                        <p className="text-sm font-medium text-brand-navy">
-                          Drag & drop file here, or <span className="text-brand-gold font-bold">browse</span>
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          {uploadType === "photo" 
-                            ? "Supports PNG, JPG, WebP, GIF (Max 10MB)" 
-                            : "Supports MP4, WebM (Max 50MB)"}
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                  <label htmlFor="media-url" className="text-sm font-semibold text-brand-navy">
+                    {uploadType === "photo" ? "Imgur Image Link" : "YouTube Video Link"}
+                  </label>
+                  <input
+                    id="media-url"
+                    type="url"
+                    required
+                    value={uploadUrl}
+                    onChange={(e) => setUploadUrl(e.target.value)}
+                    placeholder={
+                      uploadType === "photo"
+                        ? "e.g., https://imgur.com/abc or direct image URL"
+                        : "e.g., https://www.youtube.com/watch?v=abc"
+                    }
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-brand-gold text-gray-800 transition-colors"
+                  />
                 </div>
 
                 {/* Error Message */}
@@ -610,16 +573,16 @@ export function Gallery() {
                   </button>
                   <Button
                     type="submit"
-                    disabled={isUploading || !uploadFile}
+                    disabled={isUploading || !uploadUrl}
                     className="flex-1 py-3 rounded-xl bg-brand-navy hover:bg-brand-navy/95 text-white font-semibold flex items-center justify-center gap-2 cursor-pointer"
                   >
                     {isUploading ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin text-white" />
-                        <span>Uploading...</span>
+                        <span>Saving...</span>
                       </>
                     ) : (
-                      <span>Upload Media</span>
+                      <span>Add Item</span>
                     )}
                   </Button>
                 </div>
