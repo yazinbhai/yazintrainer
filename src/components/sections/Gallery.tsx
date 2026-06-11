@@ -26,9 +26,30 @@ interface GalleryItem {
 
 // Helpers for YouTube and Imgur URLs
 function getYouTubeId(url: string): string | null {
+  if (!url) return null;
+  
+  // Handle shorts
+  const shortsMatch = url.match(/\/shorts\/([a-zA-Z0-9_-]{11})/);
+  if (shortsMatch) return shortsMatch[1];
+  
+  // Handle live streams
+  const liveMatch = url.match(/\/live\/([a-zA-Z0-9_-]{11})/);
+  if (liveMatch) return liveMatch[1];
+
+  // Standard formats
   const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
   const match = url.match(regExp);
-  return (match && match[2].length === 11) ? match[2] : null;
+  if (match && match[2].trim().length === 11) {
+    return match[2].trim();
+  }
+  
+  // Direct ID check (fallback if they pasted just the ID)
+  const directId = url.trim();
+  if (directId.length === 11 && /^[a-zA-Z0-9_-]{11}$/.test(directId)) {
+    return directId;
+  }
+
+  return null;
 }
 
 function getYouTubeEmbedUrl(url: string): string {

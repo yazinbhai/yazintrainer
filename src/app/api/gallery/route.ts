@@ -23,7 +23,7 @@ const DEFAULT_ITEMS = [
     id: "default-3",
     title: "Speaking Keynote: The Art of Influence",
     type: "video",
-    url: "https://assets.mixkit.co/videos/preview/mixkit-man-holding-a-speech-at-a-business-conference-34281-large.mp4",
+    url: "https://www.youtube.com/watch?v=eIho2S0ZahI",
     date: "March 15, 2026",
   },
   {
@@ -37,7 +37,7 @@ const DEFAULT_ITEMS = [
     id: "default-5",
     title: "High-Stakes Presentation Coaching Video",
     type: "video",
-    url: "https://assets.mixkit.co/videos/preview/mixkit-business-team-in-a-meeting-around-a-table-41712-large.mp4",
+    url: "https://www.youtube.com/watch?v=w82a1FT5o88",
     date: "January 18, 2026",
   }
 ];
