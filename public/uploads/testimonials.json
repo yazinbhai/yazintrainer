@@ -1,0 +1,20 @@
+[
+  {
+    "id": "default-t1",
+    "quote": "Yazin’s approach completely changed how our sales team communicates. We moved past generic pitches into genuine, strategic conversation. It directly impacted our Q3 closing rates.",
+    "author": "Rahul V.",
+    "role": "VP of Sales, Regional Tech"
+  },
+  {
+    "id": "default-t2",
+    "quote": "The IELTS mastery program isn't just about passing a test. It's about structuring thought. I achieved a Band 8.5 because I was taught how to think natively, not just translate.",
+    "author": "Sneha M.",
+    "role": "Post-grad applicant, UK"
+  },
+  {
+    "id": "default-t3",
+    "quote": "We brought Yazin Trainer in to bridge the gap between our fresh campus hires and our client-facing realities. The transformation in their email etiquette and meeting presence was stark.",
+    "author": "Director of HR",
+    "role": "Enterprise Consultancy Firm"
+  }
+]

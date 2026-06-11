@@ -1,0 +1,30 @@
+[
+  {
+    "id": "default-2",
+    "title": "Interactive Corporate Communication Workshop",
+    "type": "photo",
+    "url": "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=1200",
+    "date": "April 28, 2026"
+  },
+  {
+    "id": "default-3",
+    "title": "Speaking Keynote: The Art of Influence",
+    "type": "video",
+    "url": "https://assets.mixkit.co/videos/preview/mixkit-man-holding-a-speech-at-a-business-conference-34281-large.mp4",
+    "date": "March 15, 2026"
+  },
+  {
+    "id": "default-4",
+    "title": "Strategic Communication Training Session",
+    "type": "photo",
+    "url": "https://images.unsplash.com/photo-1515187029135-18ee286d815b?q=80&w=1200",
+    "date": "February 22, 2026"
+  },
+  {
+    "id": "default-5",
+    "title": "High-Stakes Presentation Coaching Video",
+    "type": "video",
+    "url": "https://assets.mixkit.co/videos/preview/mixkit-business-team-in-a-meeting-around-a-table-41712-large.mp4",
+    "date": "January 18, 2026"
+  }
+]
