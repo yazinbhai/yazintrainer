@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { writeFile, readFile, mkdir } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
+import { kv } from "@vercel/kv";
 
 const DEFAULT_TESTIMONIALS = [
   {
@@ -28,14 +29,29 @@ const getTestimonialsJsonPath = () => {
   return path.join(process.cwd(), "public", "uploads", "testimonials.json");
 };
 
+// Check if Vercel KV is configured
+const isKvConfigured = () => {
+  return !!process.env.KV_REST_API_URL || !!process.env.KV_URL;
+};
+
 export async function GET() {
   try {
-    const jsonPath = getTestimonialsJsonPath();
-    if (!existsSync(jsonPath)) {
-      return NextResponse.json(DEFAULT_TESTIMONIALS);
+    if (isKvConfigured()) {
+      let items = await kv.get<any[]>("testimonials");
+      if (!items) {
+        items = DEFAULT_TESTIMONIALS;
+        await kv.set("testimonials", items);
+      }
+      return NextResponse.json(items);
+    } else {
+      // Local fallback
+      const jsonPath = getTestimonialsJsonPath();
+      if (!existsSync(jsonPath)) {
+        return NextResponse.json(DEFAULT_TESTIMONIALS);
+      }
+      const fileContent = await readFile(jsonPath, "utf-8");
+      return NextResponse.json(JSON.parse(fileContent));
     }
-    const fileContent = await readFile(jsonPath, "utf-8");
-    return NextResponse.json(JSON.parse(fileContent));
   } catch (error: any) {
     console.error("GET testimonials error:", error);
     return NextResponse.json({ error: "Failed to read testimonials" }, { status: 500 });
@@ -55,20 +71,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const uploadDir = path.join(process.cwd(), "public", "uploads");
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
-    }
+    let items: any[] = [];
 
-    const jsonPath = getTestimonialsJsonPath();
-    let items = [...DEFAULT_TESTIMONIALS];
-
-    if (existsSync(jsonPath)) {
-      const fileContent = await readFile(jsonPath, "utf-8");
-      try {
-        items = JSON.parse(fileContent);
-      } catch (e) {
-        // Fallback
+    // 1. Get the items
+    if (isKvConfigured()) {
+      items = await kv.get<any[]>("testimonials") || [];
+    } else {
+      // Local fallback
+      const jsonPath = getTestimonialsJsonPath();
+      if (existsSync(jsonPath)) {
+        const fileContent = await readFile(jsonPath, "utf-8");
+        try {
+          items = JSON.parse(fileContent);
+        } catch (e) {
+          items = [...DEFAULT_TESTIMONIALS];
+        }
+      } else {
+        items = [...DEFAULT_TESTIMONIALS];
       }
     }
 
@@ -98,7 +117,19 @@ export async function POST(req: Request) {
       items.push(savedItem); // Append to list
     }
 
-    await writeFile(jsonPath, JSON.stringify(items, null, 2), "utf-8");
+    // 2. Save items
+    if (isKvConfigured()) {
+      await kv.set("testimonials", items);
+    } else {
+      // Local fallback
+      const jsonPath = getTestimonialsJsonPath();
+      const uploadDir = path.dirname(jsonPath);
+      if (!existsSync(uploadDir)) {
+        await mkdir(uploadDir, { recursive: true });
+      }
+      await writeFile(jsonPath, JSON.stringify(items, null, 2), "utf-8");
+    }
+
     return NextResponse.json({ success: true, item: savedItem });
   } catch (error: any) {
     console.error("POST testimonial error:", error);
@@ -118,21 +149,36 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "ID is required" }, { status: 400 });
     }
 
-    const jsonPath = getTestimonialsJsonPath();
-    if (!existsSync(jsonPath)) {
-      return NextResponse.json({ error: "Testimonials index not found" }, { status: 404 });
+    let items: any[] = [];
+
+    // 1. Get items
+    if (isKvConfigured()) {
+      items = await kv.get<any[]>("testimonials") || [];
+    } else {
+      // Local fallback
+      const jsonPath = getTestimonialsJsonPath();
+      if (!existsSync(jsonPath)) {
+        return NextResponse.json({ error: "Testimonials index not found" }, { status: 404 });
+      }
+      const fileContent = await readFile(jsonPath, "utf-8");
+      items = JSON.parse(fileContent);
     }
 
-    const fileContent = await readFile(jsonPath, "utf-8");
-    let items = JSON.parse(fileContent);
-    
     const exists = items.some((item: any) => item.id === id);
     if (!exists) {
       return NextResponse.json({ error: "Testimonial not found" }, { status: 404 });
     }
 
-    items = items.filter((item: any) => item.id !== id);
-    await writeFile(jsonPath, JSON.stringify(items, null, 2), "utf-8");
+    const updatedItems = items.filter((item: any) => item.id !== id);
+
+    // 2. Save items
+    if (isKvConfigured()) {
+      await kv.set("testimonials", updatedItems);
+    } else {
+      // Local fallback
+      const jsonPath = getTestimonialsJsonPath();
+      await writeFile(jsonPath, JSON.stringify(updatedItems, null, 2), "utf-8");
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

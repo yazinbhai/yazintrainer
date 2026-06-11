@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { writeFile, mkdir, readFile, unlink } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
+import { kv } from "@vercel/kv";
+import { put, del } from "@vercel/blob";
 
 const DEFAULT_ITEMS = [
   {
@@ -45,14 +47,34 @@ const getGalleryJsonPath = () => {
   return path.join(process.cwd(), "public", "uploads", "gallery.json");
 };
 
+// Check if Vercel KV is configured
+const isKvConfigured = () => {
+  return !!process.env.KV_REST_API_URL || !!process.env.KV_URL;
+};
+
+// Check if Vercel Blob is configured
+const isBlobConfigured = () => {
+  return !!process.env.BLOB_READ_WRITE_TOKEN;
+};
+
 export async function GET() {
   try {
-    const jsonPath = getGalleryJsonPath();
-    if (!existsSync(jsonPath)) {
-      return NextResponse.json(DEFAULT_ITEMS);
+    if (isKvConfigured()) {
+      let items = await kv.get<any[]>("gallery_items");
+      if (!items) {
+        items = DEFAULT_ITEMS;
+        await kv.set("gallery_items", items);
+      }
+      return NextResponse.json(items);
+    } else {
+      // Local fallback
+      const jsonPath = getGalleryJsonPath();
+      if (!existsSync(jsonPath)) {
+        return NextResponse.json(DEFAULT_ITEMS);
+      }
+      const fileContent = await readFile(jsonPath, "utf-8");
+      return NextResponse.json(JSON.parse(fileContent));
     }
-    const fileContent = await readFile(jsonPath, "utf-8");
-    return NextResponse.json(JSON.parse(fileContent));
   } catch (error: any) {
     console.error("GET gallery error:", error);
     return NextResponse.json({ error: "Failed to read gallery items" }, { status: 500 });
@@ -75,38 +97,37 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-
-    const uploadDir = path.join(process.cwd(), "public", "uploads");
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
-    }
-
-    // Sanitize filename
     const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
     const filename = `${Date.now()}-${safeName}`;
-    const filePath = path.join(uploadDir, filename);
+    let fileUrl = "";
 
-    await writeFile(filePath, buffer);
+    // 1. Save file (to Blob or local filesystem)
+    if (isBlobConfigured()) {
+      const blob = await put(`uploads/${filename}`, file, {
+        access: "public",
+        addRandomSuffix: false,
+      });
+      fileUrl = blob.url;
+    } else {
+      // Local fallback
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
 
-    const jsonPath = getGalleryJsonPath();
-    let items = [...DEFAULT_ITEMS];
-
-    if (existsSync(jsonPath)) {
-      const fileContent = await readFile(jsonPath, "utf-8");
-      try {
-        items = JSON.parse(fileContent);
-      } catch (e) {
-        // use default if JSON parse fails
+      const uploadDir = path.join(process.cwd(), "public", "uploads");
+      if (!existsSync(uploadDir)) {
+        await mkdir(uploadDir, { recursive: true });
       }
+
+      const filePath = path.join(uploadDir, filename);
+      await writeFile(filePath, buffer);
+      fileUrl = `/uploads/${filename}`;
     }
 
     const newItem = {
       id: Date.now().toString(),
       title,
       type,
-      url: `/uploads/${filename}`,
+      url: fileUrl,
       date: new Date().toLocaleDateString("en-US", {
         year: "numeric",
         month: "long",
@@ -114,8 +135,31 @@ export async function POST(req: Request) {
       }),
     };
 
-    items.unshift(newItem);
-    await writeFile(jsonPath, JSON.stringify(items, null, 2), "utf-8");
+    // 2. Save items database (to KV or local JSON file)
+    if (isKvConfigured()) {
+      let items = await kv.get<any[]>("gallery_items");
+      if (!items) {
+        items = [...DEFAULT_ITEMS];
+      }
+      items.unshift(newItem);
+      await kv.set("gallery_items", items);
+    } else {
+      // Local fallback
+      const jsonPath = getGalleryJsonPath();
+      let items = [...DEFAULT_ITEMS];
+
+      if (existsSync(jsonPath)) {
+        const fileContent = await readFile(jsonPath, "utf-8");
+        try {
+          items = JSON.parse(fileContent);
+        } catch (e) {
+          // fallback to default items
+        }
+      }
+
+      items.unshift(newItem);
+      await writeFile(jsonPath, JSON.stringify(items, null, 2), "utf-8");
+    }
 
     return NextResponse.json({ success: true, item: newItem });
   } catch (error: any) {
@@ -136,26 +180,40 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "ID is required" }, { status: 400 });
     }
 
-    const jsonPath = getGalleryJsonPath();
-    let items = [...DEFAULT_ITEMS];
+    let items: any[] = [];
+    let itemToDelete: any = null;
 
-    if (existsSync(jsonPath)) {
-      const fileContent = await readFile(jsonPath, "utf-8");
-      try {
-        items = JSON.parse(fileContent);
-      } catch (e) {
-        // use default if JSON parse fails
+    // 1. Retrieve the list of items
+    if (isKvConfigured()) {
+      items = await kv.get<any[]>("gallery_items") || [];
+    } else {
+      // Local fallback
+      const jsonPath = getGalleryJsonPath();
+      if (existsSync(jsonPath)) {
+        const fileContent = await readFile(jsonPath, "utf-8");
+        try {
+          items = JSON.parse(fileContent);
+        } catch (e) {
+          items = [...DEFAULT_ITEMS];
+        }
+      } else {
+        items = [...DEFAULT_ITEMS];
       }
     }
 
-    const itemToDelete = items.find((item: any) => item.id === id);
-
+    itemToDelete = items.find((item: any) => item.id === id);
     if (!itemToDelete) {
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
-    // If it's an uploaded file (starts with /uploads), delete it from disk
-    if (itemToDelete.url.startsWith("/uploads/")) {
+    // 2. Delete the file (from Blob or local filesystem)
+    if (itemToDelete.url.startsWith("https://") && isBlobConfigured()) {
+      // Vercel Blob file deletion
+      await del(itemToDelete.url).catch((err) => {
+        console.warn("Failed to delete blob file:", err);
+      });
+    } else if (itemToDelete.url.startsWith("/uploads/")) {
+      // Local file deletion
       const filePath = path.join(process.cwd(), "public", itemToDelete.url);
       if (existsSync(filePath)) {
         await unlink(filePath).catch((err) => {
@@ -164,15 +222,20 @@ export async function DELETE(req: Request) {
       }
     }
 
-    items = items.filter((item: any) => item.id !== id);
-    
-    // Ensure parent directories exist
-    const uploadDir = path.dirname(jsonPath);
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
+    // 3. Update the database
+    const updatedItems = items.filter((item: any) => item.id !== id);
+
+    if (isKvConfigured()) {
+      await kv.set("gallery_items", updatedItems);
+    } else {
+      // Local fallback
+      const jsonPath = getGalleryJsonPath();
+      const uploadDir = path.dirname(jsonPath);
+      if (!existsSync(uploadDir)) {
+        await mkdir(uploadDir, { recursive: true });
+      }
+      await writeFile(jsonPath, JSON.stringify(updatedItems, null, 2), "utf-8");
     }
-    
-    await writeFile(jsonPath, JSON.stringify(items, null, 2), "utf-8");
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
