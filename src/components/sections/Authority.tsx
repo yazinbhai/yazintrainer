@@ -59,83 +59,165 @@ export function Authority() {
     const x = useTransform(scrollYProgress, [0, 1], [0, -scrollRange]);
 
     return (
-        <section ref={targetRef} className="relative h-[300vh] bg-brand-muted" id="story">
-            <div className="sticky top-0 h-screen flex flex-col justify-center overflow-hidden">
+        <section ref={targetRef} className="relative h-auto md:h-[300vh] bg-brand-muted" id="story">
+            
+            {/* Desktop View (Sticky Horizontal Scroll) */}
+            <div className="hidden md:block sticky top-0 h-screen overflow-hidden">
+                <div className="h-full flex flex-col justify-center">
+                    
+                    {/* Header Content */}
+                    <div className="container px-6 md:px-12 mx-auto w-full mb-8 shrink-0">
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            className="max-w-2xl"
+                        >
+                            <h2 className="text-3xl md:text-5xl font-bold text-brand-navy mb-4">
+                                The Architect <br />
+                                <span className="text-brand-indigo">Behind the Mastery.</span>
+                            </h2>
+                            <p className="text-gray-600 text-lg">
+                                Yazin T. Azad brings a rare synthesis of corporate trenches, facilitation strategy,
+                                and certified instructional design to every engagement.
+                            </p>
+                        </motion.div>
+                    </div>
 
-                {/* Header Content */}
-                <div className="container px-6 md:px-12 mx-auto w-full mb-8 shrink-0">
+                    {/* Horizontal Scroll Track */}
                     <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        className="max-w-2xl"
+                        ref={trackRef}
+                        style={{ x }}
+                        className="flex gap-6 md:gap-8 px-6 md:pl-12 w-max"
                     >
-                        <h2 className="text-3xl md:text-5xl font-bold text-brand-navy mb-4">
-                            The Architect <br />
-                            <span className="text-brand-indigo">Behind the Mastery.</span>
-                        </h2>
-                        <p className="text-gray-600 text-lg">
-                            Yazin T. Azad brings a rare synthesis of corporate trenches, facilitation strategy,
-                            and certified instructional design to every engagement.
-                        </p>
+
+                        {/* Intro Card */}
+                        <div className="w-[300px] md:w-[400px] h-[350px] shrink-0 bg-brand-navy text-white rounded-3xl relative overflow-hidden group shadow-xl flex flex-col justify-end p-8">
+                            <Image
+                                src="/Yazin_professional.png"
+                                alt="Yazin T. Azad"
+                                fill
+                                className="object-cover opacity-60 group-hover:opacity-100 transition-all duration-700 mix-blend-luminosity grayscale group-hover:grayscale-0"
+                                sizes="(max-width: 768px) 300px, 400px"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-brand-navy via-brand-navy/60 to-transparent"></div>
+
+                            <div className="relative z-10 flex flex-col">
+                                <div className="mb-4">
+                                    <span className="text-brand-gold font-semibold uppercase tracking-wider text-sm drop-shadow-md">Founder</span>
+                                    <h3 className="text-3xl font-bold mt-1 drop-shadow-md">Yazin T. Azad</h3>
+                                </div>
+                                <div className="border-t border-white/30 pt-4">
+                                    <ul className="space-y-2 text-sm text-gray-100 font-medium tracking-wide">
+                                        <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-brand-gold shadow-[0_0_8px_rgba(255,215,0,0.8)]"></div> Masters in Human Resource Management</li>
+                                        <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-brand-gold shadow-[0_0_8px_rgba(255,215,0,0.8)]"></div> Certified Master Soft Skills Trainer</li>
+                                        <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-brand-gold shadow-[0_0_8px_rgba(255,215,0,0.8)]"></div> Certified IELTS, TEFL & TESOL Trainer</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Timeline Cards */}
+                        {timeline.map((item, index) => (
+                            <div
+                                key={index}
+                                className="w-[300px] md:w-[350px] h-[350px] shrink-0 bg-white border border-gray-100 rounded-3xl p-8 flex flex-col shadow-sm hover:shadow-xl hover:-translate-y-2 hover:border-brand-indigo/20 transition-all duration-300 group"
+                            >
+                                <div className="text-sm font-bold text-brand-gold uppercase tracking-widest mb-4">
+                                    {item.year}
+                                </div>
+                                <h3 className="text-2xl font-bold text-brand-navy mb-4 border-b border-gray-100 pb-4">
+                                    {item.title}
+                                </h3>
+                                <p className="text-gray-600 leading-relaxed">
+                                    {item.description}
+                                </p>
+                            </div>
+                        ))}
+
+                        {/* Spacer block to add padding at the very end of the scroll array */}
+                        <div className="w-[6vw] md:w-[10vw] shrink-0"></div>
+
                     </motion.div>
                 </div>
+            </div>
 
-                {/* Horizontal Scroll Track */}
-                <motion.div
-                    ref={trackRef}
-                    style={{ x }}
-                    className="flex gap-6 md:gap-8 px-6 md:pl-12 w-max"
-                >
+            {/* Mobile View (Vertical Timeline) */}
+            <div className="block md:hidden py-16">
+                
+                {/* Header Content */}
+                <div className="container px-6 mx-auto mb-10">
+                    <h2 className="text-3xl font-bold text-brand-navy mb-4">
+                        The Architect <br />
+                        <span className="text-brand-indigo">Behind the Mastery.</span>
+                    </h2>
+                    <p className="text-gray-600 text-base leading-relaxed">
+                        Yazin T. Azad brings a rare synthesis of corporate trenches, facilitation strategy,
+                        and certified instructional design to every engagement.
+                    </p>
+                </div>
 
-                    {/* Intro Card */}
-                    <div className="w-[300px] md:w-[400px] h-[350px] shrink-0 bg-brand-navy text-white rounded-3xl relative overflow-hidden group shadow-xl flex flex-col justify-end p-8">
+                {/* Yazin Profile Card */}
+                <div className="container px-6 mx-auto mb-12">
+                    <div className="w-full h-[320px] bg-brand-navy text-white rounded-3xl relative overflow-hidden group shadow-lg flex flex-col justify-end p-6">
                         <Image
                             src="/Yazin_professional.png"
                             alt="Yazin T. Azad"
                             fill
-                            className="object-cover opacity-60 group-hover:opacity-100 transition-all duration-700 mix-blend-luminosity grayscale group-hover:grayscale-0"
-                            sizes="(max-width: 768px) 300px, 400px"
+                            className="object-cover opacity-60 mix-blend-luminosity grayscale"
+                            sizes="(max-width: 768px) 100vw, 400px"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-brand-navy via-brand-navy/60 to-transparent"></div>
-
                         <div className="relative z-10 flex flex-col">
                             <div className="mb-4">
-                                <span className="text-brand-gold font-semibold uppercase tracking-wider text-sm drop-shadow-md">Founder</span>
-                                <h3 className="text-3xl font-bold mt-1 drop-shadow-md">Yazin T. Azad</h3>
+                                <span className="text-brand-gold font-semibold uppercase tracking-wider text-xs">Founder</span>
+                                <h3 className="text-2xl font-bold mt-0.5">Yazin T. Azad</h3>
                             </div>
-                            <div className="border-t border-white/30 pt-4">
-                                <ul className="space-y-2 text-sm text-gray-100 font-medium tracking-wide">
-                                    <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-brand-gold shadow-[0_0_8px_rgba(255,215,0,0.8)]"></div> Masters in Human Resource Management</li>
-                                    <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-brand-gold shadow-[0_0_8px_rgba(255,215,0,0.8)]"></div> Certified Master Soft Skills Trainer</li>
-                                    <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-brand-gold shadow-[0_0_8px_rgba(255,215,0,0.8)]"></div> Certified IELTS, TEFL & TESOL Trainer</li>
+                            <div className="border-t border-white/20 pt-3">
+                                <ul className="space-y-1.5 text-xs text-gray-200 font-medium tracking-wide">
+                                    <li className="flex items-center gap-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-brand-gold shadow-[0_0_8px_rgba(255,215,0,0.8)]"></div>
+                                        Masters in Human Resource Management
+                                    </li>
+                                    <li className="flex items-center gap-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-brand-gold shadow-[0_0_8px_rgba(255,215,0,0.8)]"></div>
+                                        Certified Master Soft Skills Trainer
+                                    </li>
+                                    <li className="flex items-center gap-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-brand-gold shadow-[0_0_8px_rgba(255,215,0,0.8)]"></div>
+                                        Certified IELTS, TEFL & TESOL Trainer
+                                    </li>
                                 </ul>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    {/* Timeline Cards */}
-                    {timeline.map((item, index) => (
-                        <div
-                            key={index}
-                            className="w-[300px] md:w-[350px] h-[350px] shrink-0 bg-white border border-gray-100 rounded-3xl p-8 flex flex-col shadow-sm hover:shadow-xl hover:-translate-y-2 hover:border-brand-indigo/20 transition-all duration-300 group"
-                        >
-                            <div className="text-sm font-bold text-brand-gold uppercase tracking-widest mb-4">
-                                {item.year}
+                {/* Timeline Cards */}
+                <div className="container px-6 mx-auto">
+                    <div className="relative border-l border-brand-indigo/20 pl-6 ml-4 space-y-8">
+                        {timeline.map((item, index) => (
+                            <div key={index} className="relative">
+                                {/* Timeline Dot */}
+                                <div className="absolute -left-[32px] top-1.5 w-4 h-4 rounded-full border-2 border-brand-indigo bg-brand-muted flex items-center justify-center">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-brand-gold"></div>
+                                </div>
+                                
+                                <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300">
+                                    <div className="text-xs font-bold text-brand-gold uppercase tracking-widest mb-2">
+                                        {item.year}
+                                    </div>
+                                    <h3 className="text-lg font-bold text-brand-navy mb-2 pb-2 border-b border-gray-100">
+                                        {item.title}
+                                    </h3>
+                                    <p className="text-gray-600 text-sm leading-relaxed">
+                                        {item.description}
+                                    </p>
+                                </div>
                             </div>
-                            <h3 className="text-2xl font-bold text-brand-navy mb-4 border-b border-gray-100 pb-4">
-                                {item.title}
-                            </h3>
-                            <p className="text-gray-600 leading-relaxed">
-                                {item.description}
-                            </p>
-                        </div>
-                    ))}
-
-                    {/* Spacer block to add padding at the very end of the scroll array */}
-                    <div className="w-[6vw] md:w-[10vw] shrink-0"></div>
-
-                </motion.div>
+                        ))}
+                    </div>
+                </div>
             </div>
         </section>
     );

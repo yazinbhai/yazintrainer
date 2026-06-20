@@ -48,7 +48,7 @@ export function Hero() {
                         className="text-lg md:text-xl text-gray-600 mb-12 max-w-2xl mx-auto leading-relaxed"
                     >
                         Premium Soft Skills, Communicative English & IELTS Training
-                        engineered for B2B Corporates, Institutions, and driven professionals.
+                        engineered for Corporates, Institutions, and driven professionals.
                     </motion.p>
 
                     {/* CTA Buttons */}
