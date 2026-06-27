@@ -62,7 +62,17 @@ export async function GET() {
     if (kvClient) {
       let items = await kvClient.get<any[]>("gallery_items");
       if (!items) {
-        items = DEFAULT_ITEMS;
+        const jsonPath = getGalleryJsonPath();
+        if (existsSync(jsonPath)) {
+          try {
+            const fileContent = await readFile(jsonPath, "utf-8");
+            items = JSON.parse(fileContent);
+          } catch (e) {
+            items = DEFAULT_ITEMS;
+          }
+        } else {
+          items = DEFAULT_ITEMS;
+        }
         await kvClient.set("gallery_items", items);
       }
       return NextResponse.json(items);

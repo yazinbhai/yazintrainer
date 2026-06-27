@@ -54,7 +54,17 @@ export async function GET() {
     if (kvClient) {
       let items = await kvClient.get<any[]>("testimonials");
       if (!items) {
-        items = DEFAULT_TESTIMONIALS;
+        const jsonPath = getTestimonialsJsonPath();
+        if (existsSync(jsonPath)) {
+          try {
+            const fileContent = await readFile(jsonPath, "utf-8");
+            items = JSON.parse(fileContent);
+          } catch (e) {
+            items = DEFAULT_TESTIMONIALS;
+          }
+        } else {
+          items = DEFAULT_TESTIMONIALS;
+        }
         await kvClient.set("testimonials", items);
       }
       return NextResponse.json(items);
