@@ -233,7 +233,7 @@ export function Testimonials() {
       <div className="container px-6 md:px-12 mx-auto max-w-5xl text-center relative">
         
         {/* Admin Controls Header */}
-        <div className="absolute top-0 right-6 z-20 flex items-center gap-3">
+        <div className="flex justify-end items-center gap-3 mb-6 relative z-20">
           <button
             onClick={handleAdminToggle}
             className={`flex items-center gap-2 px-4 py-1.5 rounded-full border text-xs font-semibold tracking-wide transition-all ${
@@ -267,7 +267,7 @@ export function Testimonials() {
             <Loader2 className="w-8 h-8 animate-spin text-brand-indigo" />
           </div>
         ) : items.length > 0 ? (
-          <div className="relative h-[280px] md:h-[220px] flex items-center justify-center">
+          <div className="relative min-h-[320px] md:min-h-[220px] flex items-center justify-center">
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentIndex}
@@ -275,7 +275,7 @@ export function Testimonials() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -50 }}
                 transition={{ duration: 0.5, ease: "easeInOut" }}
-                className="absolute inset-0 flex flex-col items-center justify-center px-4"
+                className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex flex-col items-center justify-center px-4"
               >
                 <h3 className="text-2xl md:text-3xl lg:text-4xl font-medium text-brand-navy leading-relaxed mb-8 max-w-4xl mx-auto">
                   "{items[currentIndex].quote}"
