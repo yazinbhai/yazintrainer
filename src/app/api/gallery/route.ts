@@ -6,39 +6,18 @@ import { createClient } from "@vercel/kv";
 
 const DEFAULT_ITEMS = [
   {
-    id: "default-1",
-    title: "Executive Presence & Public Speaking Coaching",
-    type: "photo",
-    url: "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=1200",
-    date: "May 10, 2026",
-  },
-  {
-    id: "default-2",
-    title: "Interactive Corporate Communication Workshop",
-    type: "photo",
-    url: "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=1200",
-    date: "April 28, 2026",
-  },
-  {
-    id: "default-3",
-    title: "Speaking Keynote: The Art of Influence",
+    id: "1782964038063",
+    title: "Malabar Polytechnic",
     type: "video",
-    url: "https://www.youtube.com/watch?v=eIho2S0ZahI",
-    date: "March 15, 2026",
+    url: "https://www.youtube.com/shorts/-TkwxfPlF-4?feature=share",
+    date: "July 2, 2026",
   },
   {
-    id: "default-4",
-    title: "Strategic Communication Training Session",
-    type: "photo",
-    url: "https://images.unsplash.com/photo-1515187029135-18ee286d815b?q=80&w=1200",
-    date: "February 22, 2026",
-  },
-  {
-    id: "default-5",
-    title: "High-Stakes Presentation Coaching Video",
+    id: "1782563377397",
+    title: "Review from Centre for Advanced Managemt Studies",
     type: "video",
-    url: "https://www.youtube.com/watch?v=w82a1FT5o88",
-    date: "January 18, 2026",
+    url: "https://youtube.com/shorts/0T1j7941PF8?feature=share",
+    date: "June 27, 2026",
   }
 ];
 
