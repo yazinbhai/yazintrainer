@@ -76,47 +76,73 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { title, type, url } = await req.json();
+    const { id, title, type, url, thumbnailUrl } = await req.json();
 
     if (!title || !type || !url) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const newItem = {
-      id: Date.now().toString(),
-      title,
-      type,
-      url,
-      date: new Date().toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      }),
-    };
-
+    let items: any[] = [];
     const kvClient = getKvClient();
 
     if (kvClient) {
-      let items = await kvClient.get<any[]>("gallery_items");
-      if (!items) {
-        items = [...DEFAULT_ITEMS];
-      }
-      items.unshift(newItem);
-      await kvClient.set("gallery_items", items);
+      items = (await kvClient.get<any[]>("gallery_items")) || [...DEFAULT_ITEMS];
     } else {
       const jsonPath = getGalleryJsonPath();
-      let items = [...DEFAULT_ITEMS];
-
       if (existsSync(jsonPath)) {
         const fileContent = await readFile(jsonPath, "utf-8");
         try {
           items = JSON.parse(fileContent);
         } catch (e) {
-          // ignore
+          items = [...DEFAULT_ITEMS];
         }
+      } else {
+        items = [...DEFAULT_ITEMS];
       }
+    }
 
-      items.unshift(newItem);
+    let savedItem;
+
+    if (id) {
+      // Edit mode
+      items = items.map((item) => {
+        if (item.id === id) {
+          savedItem = {
+            ...item,
+            title,
+            type,
+            url,
+            thumbnailUrl: thumbnailUrl || item.thumbnailUrl || "",
+          };
+          return savedItem;
+        }
+        return item;
+      });
+
+      if (!savedItem) {
+        return NextResponse.json({ error: "Item not found for editing" }, { status: 404 });
+      }
+    } else {
+      // Create mode
+      savedItem = {
+        id: Date.now().toString(),
+        title,
+        type,
+        url,
+        thumbnailUrl: thumbnailUrl || "",
+        date: new Date().toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        }),
+      };
+      items.unshift(savedItem);
+    }
+
+    if (kvClient) {
+      await kvClient.set("gallery_items", items);
+    } else {
+      const jsonPath = getGalleryJsonPath();
       const uploadDir = path.dirname(jsonPath);
       if (!existsSync(uploadDir)) {
         await mkdir(uploadDir, { recursive: true });
@@ -124,10 +150,10 @@ export async function POST(req: Request) {
       await writeFile(jsonPath, JSON.stringify(items, null, 2), "utf-8");
     }
 
-    return NextResponse.json({ success: true, item: newItem });
+    return NextResponse.json({ success: true, item: savedItem });
   } catch (error: any) {
-    console.error("POST link error:", error);
-    return NextResponse.json({ error: error.message || "Failed to save link" }, { status: 500 });
+    console.error("POST gallery item error:", error);
+    return NextResponse.json({ error: error.message || "Failed to save gallery item" }, { status: 500 });
   }
 }
 

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Plus, 
+  Edit,
   Trash2, 
   Image as ImageIcon, 
   Video as VideoIcon, 
@@ -12,7 +13,9 @@ import {
   Lock, 
   Unlock,
   Loader2,
-  Link as LinkIcon
+  Upload,
+  Link as LinkIcon,
+  Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -21,6 +24,7 @@ interface GalleryItem {
   title: string;
   type: string; // 'photo' | 'video'
   url: string;
+  thumbnailUrl?: string;
   date: string;
 }
 
@@ -43,7 +47,7 @@ function getYouTubeId(url: string): string | null {
     return match[2].trim();
   }
   
-  // Direct ID check (fallback if they pasted just the ID)
+  // Direct ID check
   const directId = url.trim();
   if (directId.length === 11 && /^[a-zA-Z0-9_-]{11}$/.test(directId)) {
     return directId;
@@ -59,7 +63,7 @@ function getYouTubeEmbedUrl(url: string): string {
 
 function getYouTubeThumbnail(url: string): string {
   const id = getYouTubeId(url);
-  return id ? `https://img.youtube.com/vi/${id}/maxresdefault.jpg` : "/default-video-thumbnail.jpg";
+  return id ? `https://img.youtube.com/vi/${id}/maxresdefault.jpg` : "";
 }
 
 function getDirectImgurUrl(url: string): string {
@@ -72,11 +76,22 @@ function getDirectImgurUrl(url: string): string {
   return url;
 }
 
+function getItemThumbnail(item: GalleryItem): string {
+  if (item.thumbnailUrl && item.thumbnailUrl.trim() !== "") {
+    return item.thumbnailUrl;
+  }
+  if (item.type === "video") {
+    const ytThumb = getYouTubeThumbnail(item.url);
+    if (ytThumb) return ytThumb;
+  }
+  return item.url;
+}
+
 export function Gallery() {
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [activeTab, setActiveTab] = useState<"all" | "photo" | "video">("all");
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [activeLightbox, setActiveLightbox] = useState<GalleryItem | null>(null);
   
   // Password Protection State
@@ -86,11 +101,14 @@ export function Gallery() {
   const [loginError, setLoginError] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
   
-  // Upload/Link form state
+  // Form state for Add/Edit item
+  const [formId, setFormId] = useState<string | null>(null);
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploadType, setUploadType] = useState<"photo" | "video">("photo");
   const [uploadUrl, setUploadUrl] = useState("");
+  const [uploadThumbnailUrl, setUploadThumbnailUrl] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+  const [isThumbnailUploading, setIsThumbnailUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
 
   // Delete Confirmation modal states
@@ -143,7 +161,7 @@ export function Gallery() {
         setIsAdmin(true);
         setIsLoginOpen(false);
       } else {
-        setLoginError("Incorrect password. Please try again.");
+        setLoginError("Incorrect passcode. Please try again.");
       }
     } catch (err) {
       setLoginError("Connection error. Verification failed.");
@@ -152,14 +170,124 @@ export function Gallery() {
     }
   };
 
+  const openAddModal = () => {
+    setFormId(null);
+    setUploadTitle("");
+    setUploadType("photo");
+    setUploadUrl("");
+    setUploadThumbnailUrl("");
+    setUploadError("");
+    setIsFormOpen(true);
+  };
+
+  const openEditModal = (item: GalleryItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setFormId(item.id);
+    setUploadTitle(item.title);
+    setUploadType(item.type as "photo" | "video");
+    setUploadUrl(item.url);
+    setUploadThumbnailUrl(item.thumbnailUrl || "");
+    setUploadError("");
+    setIsFormOpen(true);
+  };
+
+  // Thumbnail File Upload handler
+  const handleThumbnailFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError("Thumbnail image must be under 5MB.");
+      return;
+    }
+
+    setIsThumbnailUploading(true);
+    setUploadError("");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/gallery/upload", {
+        method: "POST",
+        headers: {
+          "x-admin-password": adminPassword,
+        },
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setUploadThumbnailUrl(data.url);
+      } else {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setUploadThumbnailUrl(reader.result as string);
+          setIsThumbnailUploading(false);
+        };
+        reader.readAsDataURL(file);
+      }
+    } catch (err) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setUploadThumbnailUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsThumbnailUploading(false);
+    }
+  };
+
+  // Main Media File Upload handler
+  const handleMainFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setUploadError("");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/gallery/upload", {
+        method: "POST",
+        headers: {
+          "x-admin-password": adminPassword,
+        },
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setUploadUrl(data.url);
+      } else {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setUploadUrl(reader.result as string);
+          setIsUploading(false);
+        };
+        reader.readAsDataURL(file);
+      }
+    } catch (err) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setUploadUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const filteredItems = items.filter(
     (item) => activeTab === "all" || item.type === activeTab
   );
 
-  const handleUploadSubmit = async (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!uploadUrl) {
-      setUploadError("Please enter a media URL.");
+    if (!uploadTitle.trim() || !uploadUrl.trim()) {
+      setUploadError("Title and Media URL/File are required.");
       return;
     }
 
@@ -176,16 +304,16 @@ export function Gallery() {
           "x-admin-password": adminPassword,
         },
         body: JSON.stringify({
+          id: formId,
           title: uploadTitle,
           type: uploadType,
           url: finalUrl,
+          thumbnailUrl: uploadThumbnailUrl,
         }),
       });
 
       if (res.ok) {
-        setUploadTitle("");
-        setUploadUrl("");
-        setIsUploadOpen(false);
+        setIsFormOpen(false);
         fetchItems();
       } else {
         const errorData = await res.json();
@@ -199,7 +327,7 @@ export function Gallery() {
   };
 
   const requestDelete = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent opening Lightbox
+    e.stopPropagation();
     setDeleteTargetId(id);
     setIsDeleteConfirmOpen(true);
   };
@@ -271,11 +399,11 @@ export function Gallery() {
               >
                 <Button
                   variant="accent"
-                  onClick={() => setIsUploadOpen(true)}
+                  onClick={openAddModal}
                   className="rounded-full flex items-center gap-2 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>Add Link</span>
+                  <span>Add Gallery Item</span>
                 </Button>
               </motion.div>
             )}
@@ -307,84 +435,104 @@ export function Gallery() {
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8"
         >
           <AnimatePresence mode="popLayout">
-            {filteredItems.map((item) => (
-              <motion.div
-                layout
-                key={item.id}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ duration: 0.3 }}
-                className="group relative bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-xl transition-all cursor-pointer aspect-video"
-                onClick={() => setActiveLightbox(item)}
-              >
-                {/* Media Content */}
-                {item.type === "photo" ? (
-                  <img
-                    src={item.url}
-                    alt={item.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    loading="lazy"
-                  />
-                ) : (
+            {filteredItems.map((item) => {
+              const thumbUrl = getItemThumbnail(item);
+
+              return (
+                <motion.div
+                  layout
+                  key={item.id}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.3 }}
+                  className="group relative bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-xl transition-all cursor-pointer aspect-video"
+                  onClick={() => setActiveLightbox(item)}
+                >
+                  {/* Media Thumbnail Preview Content */}
                   <div className="relative w-full h-full bg-black flex items-center justify-center">
-                    <div className="absolute inset-0 bg-brand-navy/80 flex items-center justify-center">
-                      {getYouTubeId(item.url) ? (
-                        <img
-                          src={getYouTubeThumbnail(item.url)}
-                          alt={item.title}
-                          className="w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-500"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <video 
-                          src={item.url} 
-                          className="w-full h-full object-cover opacity-60"
-                          muted 
-                          playsInline
-                        />
-                      )}
-                    </div>
-                    {/* Dark gradient overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                    {/* Play Button Icon */}
-                    <div className="relative z-10 w-16 h-16 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/40 shadow-lg text-white group-hover:scale-110 transition-transform duration-300">
-                      <Play className="w-6 h-6 fill-white ml-1" />
-                    </div>
-                  </div>
-                )}
-
-                {/* Overlays & Information */}
-                <div className="absolute inset-0 bg-gradient-to-t from-brand-navy/90 via-brand-navy/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-6">
-                  <div className="flex items-center gap-2 mb-2">
-                    {item.type === "photo" ? (
-                      <span className="flex items-center gap-1 text-[10px] uppercase font-bold tracking-widest text-brand-gold bg-brand-gold/10 px-2 py-0.5 rounded-full">
-                        <ImageIcon className="w-3.5 h-3.5" /> Photo
-                      </span>
+                    {thumbUrl ? (
+                      <img
+                        src={thumbUrl}
+                        alt={item.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        loading="lazy"
+                      />
+                    ) : item.type === "video" ? (
+                      <video 
+                        src={item.url} 
+                        className="w-full h-full object-cover opacity-70"
+                        muted 
+                        playsInline
+                      />
                     ) : (
-                      <span className="flex items-center gap-1 text-[10px] uppercase font-bold tracking-widest text-brand-gold bg-brand-gold/10 px-2 py-0.5 rounded-full">
-                        <VideoIcon className="w-3.5 h-3.5" /> Video
-                      </span>
+                      <img
+                        src={item.url}
+                        alt={item.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        loading="lazy"
+                      />
                     )}
-                    <span className="text-[10px] text-gray-300 font-medium">{item.date}</span>
-                  </div>
-                  <h3 className="text-white text-lg font-bold line-clamp-2 leading-tight">
-                    {item.title}
-                  </h3>
-                </div>
 
-                {/* Delete Controls (Admin Only) */}
-                {isAdmin && (
-                  <button
-                    onClick={(e) => requestDelete(item.id, e)}
-                    className="absolute top-4 right-4 z-20 p-2.5 bg-red-600/90 text-white rounded-full hover:bg-red-700 transition-colors shadow-md border border-red-500/20 cursor-pointer"
-                    title="Delete Media"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
-              </motion.div>
-            ))}
+                    {/* Dark gradient overlay for videos */}
+                    {item.type === "video" && (
+                      <>
+                        <div className="absolute inset-0 bg-black/30 group-hover:bg-black/10 transition-colors" />
+                        <div className="relative z-10 w-14 h-14 bg-white/20 hover:bg-white/30 backdrop-blur-md rounded-full flex items-center justify-center border border-white/40 shadow-lg text-white group-hover:scale-110 transition-transform duration-300">
+                          <Play className="w-6 h-6 fill-white ml-0.5" />
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Overlays & Information */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-brand-navy/90 via-brand-navy/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-6">
+                    <div className="flex items-center gap-2 mb-2">
+                      {item.type === "photo" ? (
+                        <span className="flex items-center gap-1 text-[10px] uppercase font-bold tracking-widest text-brand-gold bg-brand-gold/10 px-2 py-0.5 rounded-full">
+                          <ImageIcon className="w-3.5 h-3.5" /> Photo
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-[10px] uppercase font-bold tracking-widest text-brand-gold bg-brand-gold/10 px-2 py-0.5 rounded-full">
+                          <VideoIcon className="w-3.5 h-3.5" /> Video
+                        </span>
+                      )}
+
+                      {item.thumbnailUrl && (
+                        <span className="flex items-center gap-1 text-[9px] uppercase font-semibold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                          <Sparkles className="w-2.5 h-2.5" /> Custom Cover
+                        </span>
+                      )}
+
+                      <span className="text-[10px] text-gray-300 font-medium ml-auto">{item.date}</span>
+                    </div>
+                    <h3 className="text-white text-lg font-bold line-clamp-2 leading-tight">
+                      {item.title}
+                    </h3>
+                  </div>
+
+                  {/* Admin Controls (Edit & Delete) */}
+                  {isAdmin && (
+                    <div className="absolute top-3 right-3 z-20 flex items-center gap-2 bg-slate-900/90 border border-white/20 backdrop-blur-md px-2.5 py-1 rounded-full shadow-lg">
+                      <button
+                        onClick={(e) => openEditModal(item, e)}
+                        className="p-1 text-brand-gold hover:text-white transition-colors cursor-pointer"
+                        title="Edit Item / Thumbnail"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={(e) => requestDelete(item.id, e)}
+                        className="p-1 text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+                        title="Delete Media"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
 
           {/* Empty State */}
@@ -394,7 +542,7 @@ export function Gallery() {
               <h3 className="text-xl font-bold text-brand-navy mb-2">No media found</h3>
               <p className="text-gray-500">
                 {activeTab === "all"
-                  ? "Add photo or video links to start building your gallery."
+                  ? "Add photo or video items to start building your gallery."
                   : `No ${activeTab} items exist in your gallery.`}
               </p>
             </div>
@@ -469,42 +617,42 @@ export function Gallery() {
         )}
       </AnimatePresence>
 
-      {/* Link Media Modal */}
+      {/* Add / Edit Gallery Item Modal with Thumbnail Support */}
       <AnimatePresence>
-        {isUploadOpen && (
+        {isFormOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 bg-brand-navy/80 backdrop-blur-sm flex items-center justify-center p-6"
-            onClick={() => setIsUploadOpen(false)}
+            onClick={() => setIsFormOpen(false)}
           >
             <motion.div
               initial={{ scale: 0.95, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 20 }}
-              className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden border border-gray-100"
+              className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden border border-gray-100 max-h-[90vh] flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal Header */}
-              <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-brand-navy text-white">
-                <h3 className="text-xl font-bold flex items-center gap-2">
+              <div className="px-8 py-5 border-b border-gray-100 flex items-center justify-between bg-brand-navy text-white shrink-0">
+                <h3 className="text-lg font-bold flex items-center gap-2">
                   <LinkIcon className="w-5 h-5 text-brand-gold" />
-                  <span>Add Gallery Item</span>
+                  <span>{formId ? "Edit Gallery Item & Thumbnail" : "Add Gallery Item"}</span>
                 </h3>
                 <button
-                  onClick={() => setIsUploadOpen(false)}
+                  onClick={() => setIsFormOpen(false)}
                   className="p-1.5 bg-white/5 hover:bg-white/10 text-white/80 hover:text-white rounded-lg transition-all cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              {/* Form */}
-              <form onSubmit={handleUploadSubmit} className="p-8 space-y-6">
+              {/* Form Content */}
+              <form onSubmit={handleFormSubmit} className="p-8 space-y-5 overflow-y-auto">
                 {/* Title */}
-                <div className="space-y-2">
-                  <label htmlFor="title" className="text-sm font-semibold text-brand-navy">
+                <div className="space-y-1.5">
+                  <label htmlFor="title" className="text-xs font-semibold uppercase tracking-wider text-brand-navy">
                     Media Title
                   </label>
                   <input
@@ -513,24 +661,23 @@ export function Gallery() {
                     required
                     value={uploadTitle}
                     onChange={(e) => setUploadTitle(e.target.value)}
-                    placeholder="Enter descriptive title"
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-brand-gold text-gray-800 transition-colors"
+                    placeholder="e.g. Leadership Keynote at Tech Summit 2026"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:border-brand-gold text-gray-800 text-sm"
                   />
                 </div>
 
                 {/* Media Type Selection */}
-                <div className="space-y-2">
-                  <span className="text-sm font-semibold text-brand-navy block">Media Type</span>
-                  <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-brand-navy block">
+                    Media Type
+                  </span>
+                  <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
-                      onClick={() => {
-                        setUploadType("photo");
-                        setUploadUrl("");
-                      }}
-                      className={`flex items-center justify-center gap-2 py-3 rounded-xl border font-medium transition-all cursor-pointer ${
+                      onClick={() => setUploadType("photo")}
+                      className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold transition-all cursor-pointer ${
                         uploadType === "photo"
-                          ? "bg-brand-navy/5 border-brand-navy text-brand-navy"
+                          ? "bg-brand-navy text-white border-brand-navy shadow-sm"
                           : "border-gray-200 text-gray-600 hover:border-gray-300"
                       }`}
                     >
@@ -539,13 +686,10 @@ export function Gallery() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        setUploadType("video");
-                        setUploadUrl("");
-                      }}
-                      className={`flex items-center justify-center gap-2 py-3 rounded-xl border font-medium transition-all cursor-pointer ${
+                      onClick={() => setUploadType("video")}
+                      className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold transition-all cursor-pointer ${
                         uploadType === "video"
-                          ? "bg-brand-navy/5 border-brand-navy text-brand-navy"
+                          ? "bg-brand-navy text-white border-brand-navy shadow-sm"
                           : "border-gray-200 text-gray-600 hover:border-gray-300"
                       }`}
                     >
@@ -555,47 +699,119 @@ export function Gallery() {
                   </div>
                 </div>
 
-                {/* URL Input */}
-                <div className="space-y-2">
-                  <label htmlFor="media-url" className="text-sm font-semibold text-brand-navy">
-                    {uploadType === "photo" ? "Imgur Image Link" : "YouTube Video Link"}
+                {/* Main Media URL / File Upload */}
+                <div className="space-y-1.5">
+                  <label htmlFor="media-url" className="text-xs font-semibold uppercase tracking-wider text-brand-navy flex items-center justify-between">
+                    <span>{uploadType === "photo" ? "Photo URL or File" : "Video URL (YouTube/MP4)"}</span>
                   </label>
-                  <input
-                    id="media-url"
-                    type="url"
-                    required
-                    value={uploadUrl}
-                    onChange={(e) => setUploadUrl(e.target.value)}
-                    placeholder={
-                      uploadType === "photo"
-                        ? "e.g., https://imgur.com/abc or direct image URL"
-                        : "e.g., https://www.youtube.com/watch?v=abc"
-                    }
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-brand-gold text-gray-800 transition-colors"
-                  />
+                  
+                  <div className="flex gap-2">
+                    <input
+                      id="media-url"
+                      type="text"
+                      required
+                      value={uploadUrl}
+                      onChange={(e) => setUploadUrl(e.target.value)}
+                      placeholder={
+                        uploadType === "photo"
+                          ? "e.g., https://imgur.com/abc or image URL"
+                          : "e.g., https://www.youtube.com/watch?v=abc"
+                      }
+                      className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:border-brand-gold text-gray-800 text-sm"
+                    />
+
+                    {uploadType === "photo" && (
+                      <label className="px-3.5 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 border border-gray-200 text-brand-navy text-xs font-bold flex items-center gap-1.5 cursor-pointer shrink-0">
+                        {isUploading ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-indigo" />
+                        ) : (
+                          <Upload className="w-3.5 h-3.5 text-brand-indigo" />
+                        )}
+                        <span>Upload</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleMainFileUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    )}
+                  </div>
                 </div>
+
+                {/* Thumbnail / Cover Image Feature */}
+                <div className="space-y-1.5 pt-2 border-t border-gray-100">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-brand-navy flex items-center justify-between">
+                    <span className="flex items-center gap-1 text-brand-indigo">
+                      <Sparkles className="w-3.5 h-3.5 text-brand-gold" />
+                      Custom Thumbnail / Cover Image
+                    </span>
+                    {uploadThumbnailUrl && <span className="text-emerald-600 text-[11px] font-semibold">Thumbnail Set</span>}
+                  </label>
+                  <p className="text-[11px] text-gray-500">
+                    Upload an image or paste a URL to use as the custom preview cover for this item.
+                  </p>
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={uploadThumbnailUrl}
+                      onChange={(e) => setUploadThumbnailUrl(e.target.value)}
+                      placeholder="Paste Thumbnail Image URL (optional)"
+                      className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:border-brand-gold text-gray-800 text-sm"
+                    />
+                    <label className="px-3.5 py-2.5 rounded-xl bg-brand-gold/10 hover:bg-brand-gold/20 border border-brand-gold/30 text-brand-navy text-xs font-bold flex items-center gap-1.5 cursor-pointer shrink-0">
+                      {isThumbnailUploading ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-navy" />
+                      ) : (
+                        <Upload className="w-3.5 h-3.5 text-brand-navy" />
+                      )}
+                      <span>Upload Thumb</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleThumbnailFileUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {/* Live Thumbnail Preview */}
+                {uploadThumbnailUrl && (
+                  <div className="relative w-full h-28 bg-black rounded-xl overflow-hidden border border-gray-200 shadow-sm flex items-center justify-center">
+                    <img
+                      src={uploadThumbnailUrl}
+                      alt="Thumbnail Preview"
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute top-2 left-2 bg-black/70 text-white text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-sm">
+                      Thumbnail Preview
+                    </div>
+                  </div>
+                )}
 
                 {/* Error Message */}
                 {uploadError && (
-                  <p className="text-xs font-semibold text-red-600 bg-red-50 p-3 rounded-lg border border-red-100 animate-pulse">
+                  <p className="text-xs font-semibold text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-100">
                     {uploadError}
                   </p>
                 )}
 
                 {/* Submit Action */}
-                <div className="flex gap-4 pt-2">
+                <div className="flex gap-3 pt-2">
                   <button
                     type="button"
-                    onClick={() => setIsUploadOpen(false)}
-                    disabled={isUploading}
-                    className="flex-1 py-3 border border-gray-200 hover:border-gray-300 rounded-xl text-gray-600 font-semibold transition-colors disabled:opacity-50 cursor-pointer"
+                    onClick={() => setIsFormOpen(false)}
+                    disabled={isUploading || isThumbnailUploading}
+                    className="flex-1 py-2.5 border border-gray-200 hover:border-gray-300 rounded-xl text-gray-600 text-sm font-semibold transition-colors disabled:opacity-50 cursor-pointer"
                   >
                     Cancel
                   </button>
                   <Button
                     type="submit"
-                    disabled={isUploading || !uploadUrl}
-                    className="flex-1 py-3 rounded-xl bg-brand-navy hover:bg-brand-navy/95 text-white font-semibold flex items-center justify-center gap-2 cursor-pointer"
+                    disabled={isUploading || isThumbnailUploading || !uploadUrl}
+                    className="flex-1 py-2.5 rounded-xl bg-brand-navy hover:bg-brand-navy/95 text-white text-sm font-bold flex items-center justify-center gap-2 cursor-pointer"
                   >
                     {isUploading ? (
                       <>
@@ -603,7 +819,7 @@ export function Gallery() {
                         <span>Saving...</span>
                       </>
                     ) : (
-                      <span>Add Item</span>
+                      <span>{formId ? "Save Changes" : "Add to Gallery"}</span>
                     )}
                   </Button>
                 </div>
@@ -630,7 +846,6 @@ export function Gallery() {
               className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden border border-gray-100"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Modal Header */}
               <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-brand-navy text-white">
                 <h3 className="text-lg font-bold flex items-center gap-2">
                   <Lock className="w-4 h-4 text-brand-gold" />
@@ -644,7 +859,6 @@ export function Gallery() {
                 </button>
               </div>
 
-              {/* Form */}
               <form onSubmit={handleLoginSubmit} className="p-6 space-y-4">
                 <div className="space-y-2">
                   <label htmlFor="admin-pass" className="text-sm font-semibold text-brand-navy">
@@ -658,7 +872,7 @@ export function Gallery() {
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     placeholder="Enter passcode"
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:border-brand-gold text-gray-800 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:border-brand-gold text-gray-800 text-sm transition-colors"
                   />
                 </div>
 
@@ -698,7 +912,7 @@ export function Gallery() {
         )}
       </AnimatePresence>
 
-      {/* Custom Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal */}
       <AnimatePresence>
         {isDeleteConfirmOpen && (
           <motion.div
