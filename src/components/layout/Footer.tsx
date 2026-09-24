@@ -12,13 +12,13 @@ export function Footer() {
                     {/* Brand Col */}
                     <div className="lg:col-span-1">
                         <Link href="/" className="inline-flex items-center gap-3 mb-6 group">
-                            <div className="relative w-[75px] h-[36px]">
+                            <div className="relative w-[58px] h-[35px]">
                                 <Image
                                     src="/yazin-trainer-logo.png"
                                     alt="Yazin Trainer Logo"
                                     fill
-                                    sizes="75px"
-                                    className="object-contain brightness-0 invert"
+                                    sizes="58px"
+                                    className="object-contain"
                                 />
                             </div>
                             <span className="text-2xl font-bold tracking-tight text-white transition-colors group-hover:text-brand-gold">

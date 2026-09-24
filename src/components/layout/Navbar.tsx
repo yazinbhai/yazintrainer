@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
+    { name: "Clients", href: "#clients" },
     { name: "Story", href: "#story" },
     { name: "Services", href: "#services" },
     { name: "Methodology", href: "#methodology" },
@@ -41,12 +42,12 @@ export function Navbar() {
             <div className="container mx-auto px-6 md:px-12 flex items-center justify-between">
                 {/* Logo */}
                 <Link href="/" className="relative z-10 flex items-center gap-3 group">
-                    <div className="relative w-[75px] h-[36px] transition-transform duration-300 group-hover:scale-105">
+                    <div className="relative w-[58px] h-[35px] transition-transform duration-300 group-hover:scale-105">
                         <Image
                             src="/yazin-trainer-logo.png"
                             alt="Yazin Trainer Logo"
                             fill
-                            sizes="75px"
+                            sizes="58px"
                             className="object-contain"
                             priority
                         />

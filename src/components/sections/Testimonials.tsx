@@ -260,14 +260,14 @@ export function Testimonials() {
           )}
         </div>
 
-        <Quote className="w-16 h-16 text-brand-muted/80 mx-auto mb-12" />
+        <Quote className="w-14 h-14 text-brand-muted/80 mx-auto mb-10" />
 
         {isLoading ? (
-          <div className="h-[250px] flex items-center justify-center">
+          <div className="h-[320px] flex items-center justify-center">
             <Loader2 className="w-8 h-8 animate-spin text-brand-indigo" />
           </div>
         ) : items.length > 0 ? (
-          <div className="relative min-h-[320px] md:min-h-[220px] flex items-center justify-center">
+          <div className="relative min-h-[420px] sm:min-h-[360px] md:min-h-[300px] flex items-center justify-center">
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentIndex}
@@ -277,7 +277,7 @@ export function Testimonials() {
                 transition={{ duration: 0.5, ease: "easeInOut" }}
                 className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex flex-col items-center justify-center px-4"
               >
-                <h3 className="text-2xl md:text-3xl lg:text-4xl font-medium text-brand-navy leading-relaxed mb-8 max-w-4xl mx-auto">
+                <h3 className="text-xl md:text-2xl lg:text-3xl font-medium text-brand-navy leading-relaxed mb-8 max-w-5xl mx-auto">
                   "{items[currentIndex].quote}"
                 </h3>
                 <div className="relative group">
@@ -507,12 +507,12 @@ export function Testimonials() {
                   </label>
                   <textarea
                     id="formQuote"
-                    rows={4}
+                    rows={8}
                     required
                     value={formQuote}
                     onChange={(e) => setFormQuote(e.target.value)}
                     placeholder="Type the quote here..."
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:border-brand-gold text-gray-800 transition-colors text-sm resize-none"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-brand-gold text-gray-800 transition-colors text-sm min-h-[180px] resize-none"
                   />
                 </div>
 
