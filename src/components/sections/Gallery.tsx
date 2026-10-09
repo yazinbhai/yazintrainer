@@ -3,21 +3,12 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Plus, 
-  Edit,
-  Trash2, 
   Image as ImageIcon, 
   Video as VideoIcon, 
   Play, 
   X, 
-  Lock, 
-  Unlock,
-  Loader2,
-  Upload,
-  Link as LinkIcon,
   Sparkles
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 interface GalleryItem {
   id: string;
@@ -66,16 +57,6 @@ function getYouTubeThumbnail(url: string): string {
   return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : "";
 }
 
-function getDirectImgurUrl(url: string): string {
-  if (url.includes("imgur.com") && !url.includes("i.imgur.com")) {
-    const match = url.match(/imgur\.com\/([a-zA-Z0-9]+)$/);
-    if (match) {
-      return `https://i.imgur.com/${match[1]}.jpg`;
-    }
-  }
-  return url;
-}
-
 function getItemThumbnail(item: GalleryItem): string {
   if (item.thumbnailUrl && item.thumbnailUrl.trim() !== "") {
     return item.thumbnailUrl;
@@ -91,31 +72,7 @@ function getItemThumbnail(item: GalleryItem): string {
 export function Gallery() {
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [activeTab, setActiveTab] = useState<"all" | "photo" | "video">("all");
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isFormOpen, setIsFormOpen] = useState(false);
   const [activeLightbox, setActiveLightbox] = useState<GalleryItem | null>(null);
-  
-  // Password Protection State
-  const [adminPassword, setAdminPassword] = useState("");
-  const [isLoginOpen, setIsLoginOpen] = useState(false);
-  const [loginPassword, setLoginPassword] = useState("");
-  const [loginError, setLoginError] = useState("");
-  const [isVerifying, setIsVerifying] = useState(false);
-  
-  // Form state for Add/Edit item
-  const [formId, setFormId] = useState<string | null>(null);
-  const [uploadTitle, setUploadTitle] = useState("");
-  const [uploadType, setUploadType] = useState<"photo" | "video">("photo");
-  const [uploadUrl, setUploadUrl] = useState("");
-  const [uploadThumbnailUrl, setUploadThumbnailUrl] = useState("");
-  const [isUploading, setIsUploading] = useState(false);
-  const [isThumbnailUploading, setIsThumbnailUploading] = useState(false);
-  const [uploadError, setUploadError] = useState("");
-
-  // Delete Confirmation modal states
-  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   // Fetch gallery items
   const fetchItems = async () => {
@@ -134,232 +91,9 @@ export function Gallery() {
     fetchItems();
   }, []);
 
-  const handleAdminToggle = () => {
-    if (isAdmin) {
-      setIsAdmin(false);
-      setAdminPassword("");
-    } else {
-      setLoginPassword("");
-      setLoginError("");
-      setIsLoginOpen(true);
-    }
-  };
-
-  const handleLoginSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsVerifying(true);
-    setLoginError("");
-
-    try {
-      const res = await fetch("/api/gallery/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: loginPassword }),
-      });
-
-      if (res.ok) {
-        setAdminPassword(loginPassword);
-        setIsAdmin(true);
-        setIsLoginOpen(false);
-      } else {
-        setLoginError("Incorrect passcode. Please try again.");
-      }
-    } catch (err) {
-      setLoginError("Connection error. Verification failed.");
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  const openAddModal = () => {
-    setFormId(null);
-    setUploadTitle("");
-    setUploadType("photo");
-    setUploadUrl("");
-    setUploadThumbnailUrl("");
-    setUploadError("");
-    setIsFormOpen(true);
-  };
-
-  const openEditModal = (item: GalleryItem, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setFormId(item.id);
-    setUploadTitle(item.title);
-    setUploadType(item.type as "photo" | "video");
-    setUploadUrl(item.url);
-    setUploadThumbnailUrl(item.thumbnailUrl || "");
-    setUploadError("");
-    setIsFormOpen(true);
-  };
-
-  // Thumbnail File Upload handler
-  const handleThumbnailFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError("Thumbnail image must be under 5MB.");
-      return;
-    }
-
-    setIsThumbnailUploading(true);
-    setUploadError("");
-
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const res = await fetch("/api/gallery/upload", {
-        method: "POST",
-        headers: {
-          "x-admin-password": adminPassword,
-        },
-        body: formData,
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setUploadThumbnailUrl(data.url);
-      } else {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setUploadThumbnailUrl(reader.result as string);
-          setIsThumbnailUploading(false);
-        };
-        reader.readAsDataURL(file);
-      }
-    } catch (err) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setUploadThumbnailUrl(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    } finally {
-      setIsThumbnailUploading(false);
-    }
-  };
-
-  // Main Media File Upload handler
-  const handleMainFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploading(true);
-    setUploadError("");
-
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const res = await fetch("/api/gallery/upload", {
-        method: "POST",
-        headers: {
-          "x-admin-password": adminPassword,
-        },
-        body: formData,
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setUploadUrl(data.url);
-      } else {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setUploadUrl(reader.result as string);
-          setIsUploading(false);
-        };
-        reader.readAsDataURL(file);
-      }
-    } catch (err) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setUploadUrl(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
   const filteredItems = items.filter(
     (item) => activeTab === "all" || item.type === activeTab
   );
-
-  const handleFormSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!uploadTitle.trim() || !uploadUrl.trim()) {
-      setUploadError("Title and Media URL/File are required.");
-      return;
-    }
-
-    setIsUploading(true);
-    setUploadError("");
-
-    try {
-      const finalUrl = getDirectImgurUrl(uploadUrl);
-
-      const res = await fetch("/api/gallery", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-password": adminPassword,
-        },
-        body: JSON.stringify({
-          id: formId,
-          title: uploadTitle,
-          type: uploadType,
-          url: finalUrl,
-          thumbnailUrl: uploadThumbnailUrl,
-        }),
-      });
-
-      if (res.ok) {
-        setIsFormOpen(false);
-        fetchItems();
-      } else {
-        const errorData = await res.json();
-        setUploadError(errorData.error || "Save failed. Please try again.");
-      }
-    } catch (err) {
-      setUploadError("Network error. Save failed.");
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const requestDelete = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setDeleteTargetId(id);
-    setIsDeleteConfirmOpen(true);
-  };
-
-  const confirmDelete = async () => {
-    if (!deleteTargetId) return;
-    setIsDeleting(true);
-
-    try {
-      const res = await fetch("/api/gallery", {
-        method: "DELETE",
-        headers: { 
-          "Content-Type": "application/json",
-          "x-admin-password": adminPassword,
-        },
-        body: JSON.stringify({ id: deleteTargetId }),
-      });
-
-      if (res.ok) {
-        setIsDeleteConfirmOpen(false);
-        setDeleteTargetId(null);
-        fetchItems();
-      } else {
-        alert("Failed to delete media item.");
-      }
-    } catch (err) {
-      console.error("Delete media failed:", err);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
 
   return (
     <section className="py-24 bg-brand-muted" id="gallery">
@@ -376,38 +110,6 @@ export function Gallery() {
             <p className="text-gray-600 text-lg">
               Moments from corporate training rooms, institutional workshops, and public keynotes.
             </p>
-          </div>
-
-          {/* Admin Controls Area */}
-          <div className="flex items-center gap-3 self-start md:self-end">
-            <button
-              onClick={handleAdminToggle}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-medium transition-all ${
-                isAdmin
-                  ? "bg-brand-navy border-brand-navy text-white shadow-md animate-pulse"
-                  : "bg-white border-gray-200 text-gray-700 hover:border-brand-navy cursor-pointer"
-              }`}
-            >
-              {isAdmin ? <Unlock className="w-4 h-4 text-brand-gold" /> : <Lock className="w-4 h-4" />}
-              <span>{isAdmin ? "Admin Mode On" : "Admin Mode"}</span>
-            </button>
-
-            {isAdmin && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-              >
-                <Button
-                  variant="accent"
-                  onClick={openAddModal}
-                  className="rounded-full flex items-center gap-2 cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Add Gallery Item</span>
-                </Button>
-              </motion.div>
-            )}
           </div>
         </div>
 
@@ -516,26 +218,6 @@ export function Gallery() {
                       {item.title}
                     </h3>
                   </div>
-
-                  {/* Admin Controls (Edit & Delete) */}
-                  {isAdmin && (
-                    <div className="absolute top-3 right-3 z-20 flex items-center gap-2 bg-slate-900/90 border border-white/20 backdrop-blur-md px-2.5 py-1 rounded-full shadow-lg">
-                      <button
-                        onClick={(e) => openEditModal(item, e)}
-                        className="p-1 text-brand-gold hover:text-white transition-colors cursor-pointer"
-                        title="Edit Item / Thumbnail"
-                      >
-                        <Edit className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={(e) => requestDelete(item.id, e)}
-                        className="p-1 text-red-400 hover:text-red-300 transition-colors cursor-pointer"
-                        title="Delete Media"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
                 </motion.div>
               );
             })}
@@ -548,8 +230,8 @@ export function Gallery() {
               <h3 className="text-xl font-bold text-brand-navy mb-2">No media found</h3>
               <p className="text-gray-500">
                 {activeTab === "all"
-                  ? "Add photo or video items to start building your gallery."
-                  : `No ${activeTab} items exist in your gallery.`}
+                  ? "Media items will appear here."
+                  : `No ${activeTab} items exist in gallery.`}
               </p>
             </div>
           )}
@@ -606,377 +288,16 @@ export function Gallery() {
                       className="w-full h-full object-contain"
                       controls
                       autoPlay
+                      playsInline
                     />
                   )}
                 </div>
               )}
 
-              {/* Title & Metadata */}
-              <div className="w-full max-w-3xl text-center mt-6 text-white px-4">
-                <p className="text-brand-gold text-xs font-semibold uppercase tracking-wider mb-2">
-                  {activeLightbox.type} &bull; {activeLightbox.date}
-                </p>
-                <h3 className="text-xl md:text-2xl font-bold">{activeLightbox.title}</h3>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Add / Edit Gallery Item Modal with Thumbnail Support */}
-      <AnimatePresence>
-        {isFormOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-brand-navy/80 backdrop-blur-sm flex items-center justify-center p-6"
-            onClick={() => setIsFormOpen(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 20 }}
-              className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden border border-gray-100 max-h-[90vh] flex flex-col"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Modal Header */}
-              <div className="px-8 py-5 border-b border-gray-100 flex items-center justify-between bg-brand-navy text-white shrink-0">
-                <h3 className="text-lg font-bold flex items-center gap-2">
-                  <LinkIcon className="w-5 h-5 text-brand-gold" />
-                  <span>{formId ? "Edit Gallery Item & Thumbnail" : "Add Gallery Item"}</span>
-                </h3>
-                <button
-                  onClick={() => setIsFormOpen(false)}
-                  className="p-1.5 bg-white/5 hover:bg-white/10 text-white/80 hover:text-white rounded-lg transition-all cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Form Content */}
-              <form onSubmit={handleFormSubmit} className="p-8 space-y-5 overflow-y-auto">
-                {/* Title */}
-                <div className="space-y-1.5">
-                  <label htmlFor="title" className="text-xs font-semibold uppercase tracking-wider text-brand-navy">
-                    Media Title
-                  </label>
-                  <input
-                    id="title"
-                    type="text"
-                    required
-                    value={uploadTitle}
-                    onChange={(e) => setUploadTitle(e.target.value)}
-                    placeholder="e.g. Leadership Keynote at Tech Summit 2026"
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:border-brand-gold text-gray-800 text-sm"
-                  />
-                </div>
-
-                {/* Media Type Selection */}
-                <div className="space-y-1.5">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-brand-navy block">
-                    Media Type
-                  </span>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setUploadType("photo")}
-                      className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold transition-all cursor-pointer ${
-                        uploadType === "photo"
-                          ? "bg-brand-navy text-white border-brand-navy shadow-sm"
-                          : "border-gray-200 text-gray-600 hover:border-gray-300"
-                      }`}
-                    >
-                      <ImageIcon className="w-4 h-4" />
-                      <span>Photo</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setUploadType("video")}
-                      className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold transition-all cursor-pointer ${
-                        uploadType === "video"
-                          ? "bg-brand-navy text-white border-brand-navy shadow-sm"
-                          : "border-gray-200 text-gray-600 hover:border-gray-300"
-                      }`}
-                    >
-                      <VideoIcon className="w-4 h-4" />
-                      <span>Video</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Main Media URL / File Upload */}
-                <div className="space-y-1.5">
-                  <label htmlFor="media-url" className="text-xs font-semibold uppercase tracking-wider text-brand-navy flex items-center justify-between">
-                    <span>{uploadType === "photo" ? "Photo URL or File" : "Video URL (YouTube/MP4)"}</span>
-                  </label>
-                  
-                  <div className="flex gap-2">
-                    <input
-                      id="media-url"
-                      type="text"
-                      required
-                      value={uploadUrl}
-                      onChange={(e) => setUploadUrl(e.target.value)}
-                      placeholder={
-                        uploadType === "photo"
-                          ? "e.g., https://imgur.com/abc or image URL"
-                          : "e.g., https://www.youtube.com/watch?v=abc"
-                      }
-                      className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:border-brand-gold text-gray-800 text-sm"
-                    />
-
-                    {uploadType === "photo" && (
-                      <label className="px-3.5 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 border border-gray-200 text-brand-navy text-xs font-bold flex items-center gap-1.5 cursor-pointer shrink-0">
-                        {isUploading ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-indigo" />
-                        ) : (
-                          <Upload className="w-3.5 h-3.5 text-brand-indigo" />
-                        )}
-                        <span>Upload</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleMainFileUpload}
-                          className="hidden"
-                        />
-                      </label>
-                    )}
-                  </div>
-                </div>
-
-                {/* Thumbnail / Cover Image Feature */}
-                <div className="space-y-1.5 pt-2 border-t border-gray-100">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-brand-navy flex items-center justify-between">
-                    <span className="flex items-center gap-1 text-brand-indigo">
-                      <Sparkles className="w-3.5 h-3.5 text-brand-gold" />
-                      Custom Thumbnail / Cover Image
-                    </span>
-                    {uploadThumbnailUrl && <span className="text-emerald-600 text-[11px] font-semibold">Thumbnail Set</span>}
-                  </label>
-                  <p className="text-[11px] text-gray-500">
-                    Upload an image or paste a URL to use as the custom preview cover for this item.
-                  </p>
-
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={uploadThumbnailUrl}
-                      onChange={(e) => setUploadThumbnailUrl(e.target.value)}
-                      placeholder="Paste Thumbnail Image URL (optional)"
-                      className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:border-brand-gold text-gray-800 text-sm"
-                    />
-                    <label className="px-3.5 py-2.5 rounded-xl bg-brand-gold/10 hover:bg-brand-gold/20 border border-brand-gold/30 text-brand-navy text-xs font-bold flex items-center gap-1.5 cursor-pointer shrink-0">
-                      {isThumbnailUploading ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-navy" />
-                      ) : (
-                        <Upload className="w-3.5 h-3.5 text-brand-navy" />
-                      )}
-                      <span>Upload Thumb</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleThumbnailFileUpload}
-                        className="hidden"
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                {/* Live Thumbnail Preview */}
-                {uploadThumbnailUrl && (
-                  <div className="relative w-full h-28 bg-black rounded-xl overflow-hidden border border-gray-200 shadow-sm flex items-center justify-center">
-                    <img
-                      src={uploadThumbnailUrl}
-                      alt="Thumbnail Preview"
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute top-2 left-2 bg-black/70 text-white text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-sm">
-                      Thumbnail Preview
-                    </div>
-                  </div>
-                )}
-
-                {/* Error Message */}
-                {uploadError && (
-                  <p className="text-xs font-semibold text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-100">
-                    {uploadError}
-                  </p>
-                )}
-
-                {/* Submit Action */}
-                <div className="flex gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsFormOpen(false)}
-                    disabled={isUploading || isThumbnailUploading}
-                    className="flex-1 py-2.5 border border-gray-200 hover:border-gray-300 rounded-xl text-gray-600 text-sm font-semibold transition-colors disabled:opacity-50 cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <Button
-                    type="submit"
-                    disabled={isUploading || isThumbnailUploading || !uploadUrl}
-                    className="flex-1 py-2.5 rounded-xl bg-brand-navy hover:bg-brand-navy/95 text-white text-sm font-bold flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    {isUploading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin text-white" />
-                        <span>Saving...</span>
-                      </>
-                    ) : (
-                      <span>{formId ? "Save Changes" : "Add to Gallery"}</span>
-                    )}
-                  </Button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Admin Passcode Modal */}
-      <AnimatePresence>
-        {isLoginOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-brand-navy/80 backdrop-blur-sm flex items-center justify-center p-6"
-            onClick={() => setIsLoginOpen(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 20 }}
-              className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden border border-gray-100"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-brand-navy text-white">
-                <h3 className="text-lg font-bold flex items-center gap-2">
-                  <Lock className="w-4 h-4 text-brand-gold" />
-                  <span>Admin Access</span>
-                </h3>
-                <button
-                  onClick={() => setIsLoginOpen(false)}
-                  className="p-1.5 bg-white/5 hover:bg-white/10 text-white/80 hover:text-white rounded-lg transition-all cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <form onSubmit={handleLoginSubmit} className="p-6 space-y-4">
-                <div className="space-y-2">
-                  <label htmlFor="admin-pass" className="text-sm font-semibold text-brand-navy">
-                    Enter Admin Passcode
-                  </label>
-                  <input
-                    id="admin-pass"
-                    type="password"
-                    required
-                    autoFocus
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="Enter passcode"
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:border-brand-gold text-gray-800 text-sm transition-colors"
-                  />
-                </div>
-
-                {loginError && (
-                  <p className="text-xs font-semibold text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-100 animate-pulse">
-                    {loginError}
-                  </p>
-                )}
-
-                <div className="flex gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsLoginOpen(false)}
-                    disabled={isVerifying}
-                    className="flex-1 py-2.5 border border-gray-200 hover:border-gray-300 rounded-xl text-gray-600 text-sm font-semibold transition-colors disabled:opacity-50 cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <Button
-                    type="submit"
-                    disabled={isVerifying || !loginPassword}
-                    className="flex-1 py-2.5 rounded-xl bg-brand-navy hover:bg-brand-navy/95 text-white text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    {isVerifying ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
-                        <span>Verifying...</span>
-                      </>
-                    ) : (
-                      <span>Access</span>
-                    )}
-                  </Button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Delete Confirmation Modal */}
-      <AnimatePresence>
-        {isDeleteConfirmOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-brand-navy/80 backdrop-blur-sm flex items-center justify-center p-6"
-            onClick={() => setIsDeleteConfirmOpen(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 20 }}
-              className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden border border-gray-100"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-red-600 text-white">
-                <h3 className="text-lg font-bold flex items-center gap-2">
-                  <Trash2 className="w-4 h-4" />
-                  <span>Delete Media Item</span>
-                </h3>
-                <button
-                  onClick={() => setIsDeleteConfirmOpen(false)}
-                  className="p-1.5 bg-white/5 hover:bg-white/10 text-white/80 hover:text-white rounded-lg transition-all cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="p-6 space-y-4 text-left">
-                <p className="text-gray-600 text-sm leading-relaxed">
-                  Are you sure you want to delete this media item? This action will permanently remove it from the gallery.
-                </p>
-
-                <div className="flex gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsDeleteConfirmOpen(false)}
-                    disabled={isDeleting}
-                    className="flex-1 py-2.5 border border-gray-200 hover:border-gray-300 rounded-xl text-gray-600 text-sm font-semibold transition-colors disabled:opacity-50 cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={confirmDelete}
-                    disabled={isDeleting}
-                    className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer transition-colors"
-                  >
-                    {isDeleting ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
-                        <span>Deleting...</span>
-                      </>
-                    ) : (
-                      <span>Delete</span>
-                    )}
-                  </button>
-                </div>
+              {/* Title Header */}
+              <div className="w-full text-center mt-4 text-white px-4">
+                <h3 className="text-xl font-bold">{activeLightbox.title}</h3>
+                <p className="text-xs text-gray-300 mt-1">{activeLightbox.date}</p>
               </div>
             </motion.div>
           </motion.div>

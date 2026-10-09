@@ -3,23 +3,25 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
-    { name: "Clients", href: "#clients" },
-    { name: "Story", href: "#story" },
-    { name: "Services", href: "#services" },
-    { name: "Methodology", href: "#methodology" },
-    { name: "Gallery", href: "#gallery" },
-    { name: "Insights", href: "#blog" },
+    { name: "Clients", href: "/#clients" },
+    { name: "Story", href: "/#story" },
+    { name: "Services", href: "/#services" },
+    { name: "Methodology", href: "/#methodology" },
+    { name: "Gallery", href: "/#gallery" },
+    { name: "Insights", href: "/#blog" },
 ];
 
 export function Navbar() {
     const [isScrolled, setIsScrolled] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const pathname = usePathname();
 
     // Handle scroll effect
     useEffect(() => {
@@ -29,6 +31,10 @@ export function Navbar() {
         window.addEventListener("scroll", handleScroll);
         return () => window.removeEventListener("scroll", handleScroll);
     }, []);
+
+    if (pathname === "/admin") {
+        return null;
+    }
 
     return (
         <header
