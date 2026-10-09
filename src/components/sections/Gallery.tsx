@@ -63,7 +63,7 @@ function getYouTubeEmbedUrl(url: string): string {
 
 function getYouTubeThumbnail(url: string): string {
   const id = getYouTubeId(url);
-  return id ? `https://img.youtube.com/vi/${id}/maxresdefault.jpg` : "";
+  return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : "";
 }
 
 function getDirectImgurUrl(url: string): string {
@@ -83,6 +83,7 @@ function getItemThumbnail(item: GalleryItem): string {
   if (item.type === "video") {
     const ytThumb = getYouTubeThumbnail(item.url);
     if (ytThumb) return ytThumb;
+    return "";
   }
   return item.url;
 }
@@ -457,6 +458,12 @@ export function Gallery() {
                         alt={item.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         loading="lazy"
+                        onError={(e) => {
+                          const ytId = getYouTubeId(item.url);
+                          if (ytId) {
+                            (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+                          }
+                        }}
                       />
                     ) : item.type === "video" ? (
                       <video 
@@ -476,12 +483,11 @@ export function Gallery() {
 
                     {/* Dark gradient overlay for videos */}
                     {item.type === "video" && (
-                      <>
-                        <div className="absolute inset-0 bg-black/30 group-hover:bg-black/10 transition-colors" />
-                        <div className="relative z-10 w-14 h-14 bg-white/20 hover:bg-white/30 backdrop-blur-md rounded-full flex items-center justify-center border border-white/40 shadow-lg text-white group-hover:scale-110 transition-transform duration-300">
+                      <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/30 group-hover:bg-black/10 transition-colors pointer-events-none">
+                        <div className="w-14 h-14 bg-white/20 group-hover:bg-white/30 backdrop-blur-md rounded-full flex items-center justify-center border border-white/40 shadow-lg text-white group-hover:scale-110 transition-transform duration-300">
                           <Play className="w-6 h-6 fill-white ml-0.5" />
                         </div>
-                      </>
+                      </div>
                     )}
                   </div>
 
